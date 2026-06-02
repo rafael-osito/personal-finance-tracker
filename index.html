@@ -961,7 +961,7 @@ function renderDashboard() {
     ${catIcon(t.category,18)}
     <div class="tx-body"><div class="tx-desc">${t.description}</div><div class="tx-meta">${t.date} · ${accName(t.account_id)||t.owner}</div></div>
     <div class="tx-amt ${t.type==='income'?'amount-pos':t.type==='transfer'?'':' amount-neg'}">${t.type==='income'?'+':t.type==='transfer'?'':'-'}${fmt(t.amount)}</div>
-  </div>`).join(''):'<div class="empty-state"><i class="ti ti-history"></i><p>Sem transações ainda</p></div>';ss="ti ti-history"></i><p>Sem transações</p></div>';
+  </div>`).join(''):'<div class="empty-state"><i class="ti ti-history"></i><p>Sem transações ainda</p></div>';
 }
 
 // ─── WEALTH ───────────────────────────────────────────────────────────────────
