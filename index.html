@@ -236,6 +236,32 @@ tr:hover td{background:var(--cream)}
 /* TRANSFER FIELDS */
 .transfer-fields{display:none}
 .transfer-fields.visible{display:block}
+
+/* ── MOBILE CARDS (Transações + Agendados) ── */
+.tx-card-mobile{display:none;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:6px}
+.tx-card-mobile .tx-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;gap:8px}
+.tx-card-mobile .tx-desc{font-size:14px;font-weight:600;color:var(--ink);flex:1}
+.tx-card-mobile .tx-val{font-size:16px;font-weight:700;white-space:nowrap}
+.tx-card-mobile .tx-meta{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+.tx-card-mobile .tx-actions{display:flex;gap:6px}
+
+/* Patrimônio grid responsivo */
+.acc-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+@media(max-width:768px){
+  /* Esconde tabelas, mostra cards */
+  .desktop-table{display:none!important}
+  .tx-card-mobile{display:block}
+  
+  /* Patrimônio — 2 colunas no mobile também */
+  .acc-grid-2{grid-template-columns:1fr 1fr}
+  
+  /* Projections table scroll */
+  .proj-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+}
+@media(max-width:400px){
+  .acc-grid-2{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -334,9 +360,16 @@ tr:hover td{background:var(--cream)}
           <div id="w-liabilities"></div>
         </div>
         <div>
-          <div class="card" style="margin-bottom:16px">
-            <div class="card-title"><i class="ti ti-building-bank"></i>Saldos atuais das contas</div>
-            <div id="w-accounts"></div>
+          <div style="margin-bottom:16px">
+            <div style="font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Saldos das contas</div>
+            <div class="acc-grid-2" id="w-accounts"></div>
+            <div style="background:var(--cream);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-top:8px;display:flex;align-items:center;justify-content:space-between">
+              <div>
+                <div style="font-size:11px;color:var(--ink3);margin-bottom:3px">Total líquido das contas</div>
+                <div style="font-size:22px;font-weight:700;color:var(--ink)" id="w-liquid-total">€0</div>
+              </div>
+              <i class="ti ti-wallet" style="font-size:24px;color:var(--ink3)"></i>
+            </div>
           </div>
           <div class="card">
             <div class="card-title"><i class="ti ti-trending-up"></i>Atualizar investimentos</div>
@@ -1182,20 +1215,29 @@ function renderWealth() {
   let liquidTotal = Object.values(balances).reduce((s,v)=>s+v, 0);
   const wAccEl = document.getElementById('w-accounts');
   const icons={checking:'ti-building-bank',savings:'ti-piggy-bank',credit:'ti-credit-card',investment:'ti-trending-up',cash:'ti-cash'};
-  const accRows = S.accounts.filter(a=>!['investment','savings'].includes(a.type)).map(a=>{
+  const liquidAccounts = S.accounts.filter(a=>!['investment','savings'].includes(a.type));
+  const accRows = liquidAccounts.map(a=>{
     const bal = balances[a.id] || 0;
     const isWarning = bal < 200 && bal >= 0;
     const isDanger = bal < 0;
-    return `<div class="acc-bal-card ${isDanger?'danger':isWarning?'warning':''}">
-      <div class="acc-bal-icon" style="background:var(--cream)"><i class="ti ${icons[a.type]||'ti-wallet'}" style="color:var(--gold)"></i></div>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:600">${a.name}</div>
-        <div style="font-size:11px;color:var(--ink3)">${ownerBadge(a.owner)}</div>
+    const balColor = isDanger ? 'var(--red)' : isWarning ? '#B45309' : 'var(--green)';
+    const iconBg = a.owner==='cynthia'?'#FDF2F8':a.owner==='joint'?'#F0FDF4':'#EFF6FF';
+    const iconColor = a.owner==='cynthia'?'#9D174D':a.owner==='joint'?'#166534':'#1D4ED8';
+    return `<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="width:28px;height:28px;border-radius:8px;background:${iconBg};display:flex;align-items:center;justify-content:center;flex:none">
+          <i class="ti ${icons[a.type]||'ti-wallet'}" style="font-size:14px;color:${iconColor}"></i>
+        </div>
+        <div style="font-size:12px;font-weight:600;color:var(--ink);line-height:1.3">${a.name}</div>
       </div>
-      <div style="font-size:16px;font-weight:700" class="${isDanger?'amount-neg':isWarning?'':'amount-pos'}">${fmt(bal)}</div>
+      <div style="font-size:20px;font-weight:700;color:${balColor}">${fmt(bal)}</div>
+      <div style="margin-top:4px">${ownerBadge(a.owner)}</div>
     </div>`;
   });
   wAccEl.innerHTML = accRows.join('') || '<p style="color:var(--ink3);font-size:13px">Sem contas</p>';
+  const liquidTotal2 = Object.values(balances).reduce((s,v)=>s+v,0);
+  const ltEl = document.getElementById('w-liquid-total');
+  if(ltEl) ltEl.textContent = fmt(liquidTotal2);
 
   // Render projection in wealth page
   renderProjectionTable('proj-body','proj-detail','w-alerts');
@@ -1314,7 +1356,8 @@ function renderTxList() {
   document.getElementById('tx-count').textContent=txs.length+' transação'+(txs.length!==1?'s':'');
   const el=document.getElementById('tx-table');
   if(!txs.length){el.innerHTML='<div class="empty-state"><i class="ti ti-list"></i><p>Sem transações para os filtros selecionados</p></div>';return;}
-  el.innerHTML=`<table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Conta</th><th>Titular</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody>`+
+  // Desktop table
+  const desktopTable = `<table class="desktop-table"><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Conta</th><th>Titular</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody>`+
     txs.map(t=>`<tr>
       <td style="white-space:nowrap;color:var(--ink3)">${t.date}</td>
       <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.description}</td>
@@ -1327,6 +1370,29 @@ function renderTxList() {
         <button class="btn danger sm" onclick="deleteTx('${t.id}')" title="Excluir"><i class="ti ti-trash"></i></button>
       </td>
     </tr>`).join('')+'</tbody></table>';
+
+  // Mobile cards
+  const mobileCards = txs.map(t=>{
+    const valClass = t.type==='income'?'amount-pos':t.type==='transfer'?'':'amount-neg';
+    const valPrefix = t.type==='income'?'+':t.type==='transfer'?'':'-';
+    return `<div class="tx-card-mobile">
+      <div class="tx-top">
+        <div class="tx-desc">${t.description}</div>
+        <div class="tx-val ${valClass}">${valPrefix}${fmt(t.amount)}</div>
+      </div>
+      <div class="tx-meta">
+        <span style="font-size:11px;color:var(--ink3)">${t.date}</span>
+        <span style="font-size:11px;background:var(--cream);border:1px solid var(--border);border-radius:20px;padding:1px 7px">${t.category}${t.subcategory&&t.subcategory!=='—'?' / '+t.subcategory:''}</span>
+        ${ownerBadge(t.owner)}
+      </div>
+      <div class="tx-actions">
+        <button class="btn sm" onclick="editTx('${t.id}')"><i class="ti ti-edit"></i> Editar</button>
+        <button class="btn danger sm" onclick="deleteTx('${t.id}')"><i class="ti ti-trash"></i></button>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = desktopTable + mobileCards;
 }
 
 async function deleteTx(id) {
