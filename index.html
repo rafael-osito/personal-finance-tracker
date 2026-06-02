@@ -1262,9 +1262,6 @@ function renderWealth() {
   const ltEl = document.getElementById('w-liquid-total');
   if(ltEl) ltEl.textContent = fmt(liquidTotal2);
 
-  // Render projection in wealth page
-  try { renderProjectionTable('proj-body','proj-detail','w-alerts'); } catch(e) { console.warn('Projection error:',e); }
-
   // Latest investment values
   const t212r = S.investments.filter(i=>i.account_name==='Trading212 Rafael').sort((a,b)=>b.value_date?.localeCompare(a.value_date))[0];
   const t212c = S.investments.filter(i=>i.account_name==='Trading212 Cynthia').sort((a,b)=>b.value_date?.localeCompare(a.value_date))[0];
@@ -1291,6 +1288,9 @@ function renderWealth() {
   document.getElementById('w-liabilities').innerHTML = `
     <div class="wealth-row" style="color:var(--red);font-weight:600"><span>Passivos</span><span>-${fmt(loanAmt)}</span></div>
     ${liability?`<div class="wealth-row" style="font-size:12px;color:var(--ink3)"><span>${liability.name}</span><span>-${fmt(loanAmt)}</span></div>`:''}`;
+
+  // Render projection (after all data ready)
+  try { renderProjectionTable('proj-body','proj-detail','w-alerts'); } catch(e) { console.warn('Projection:',e); }
 
   // Investment update form
   document.getElementById('w-investments-form').innerHTML = `
