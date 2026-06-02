@@ -1085,9 +1085,9 @@ function renderProjectionTable(bodyId, detailId, alertsId) {
 
   // Alerts
   const negMonths = rows.filter(r => r.isNegative);
-  const hasScheduledIncome = S.scheduled.some(s => s.type === 'income' && s.status === 'upcoming');
   if (alertEl) {
-    if (!hasScheduledIncome) {
+    const hasIncome = S.scheduled.some(s => s.type === 'income' && s.status === 'upcoming');
+    if (!hasIncome) {
       alertEl.innerHTML = `<div style="background:rgba(79,172,254,0.1);border:1px solid rgba(79,172,254,0.3);border-radius:var(--radius);padding:10px 16px;font-size:13px;color:var(--blue);display:flex;align-items:center;gap:8px"><i class="ti ti-info-circle"></i> Adicione o salário em Lançamentos agendados para ver a projeção completa.</div>`;
     } else if (negMonths.length) {
       alertEl.innerHTML = `<div style="background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.3);border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:10px"><i class="ti ti-alert-triangle" style="font-size:20px;color:var(--red);flex:none"></i><div><div style="font-weight:600;color:var(--red);font-size:13px">Atenção: saldo negativo previsto</div><div style="font-size:12px;color:var(--ink2);margin-top:2px">${negMonths.map(r => r.label).join(', ')} — revise os lançamentos agendados.</div></div></div>`;
@@ -1095,9 +1095,10 @@ function renderProjectionTable(bodyId, detailId, alertsId) {
       alertEl.innerHTML = `<div style="background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.3);border-radius:var(--radius);padding:10px 16px;font-size:13px;color:var(--green);display:flex;align-items:center;gap:8px"><i class="ti ti-circle-check"></i> Saldo positivo previsto nos próximos 6 meses.</div>`;
     }
   }
-  const hasScheduledIncome = S.scheduled.some(s => s.type === 'income' && s.status === 'upcoming');
+  const hasIncome2 = S.scheduled.some(s => s.type === 'income' && s.status === 'upcoming');
   if (alertEl) {
-    if (!hasScheduledIncome) {
+    const hasIncome = S.scheduled.some(s => s.type === 'income' && s.status === 'upcoming');
+    if (!hasIncome) {
       alertEl.innerHTML = `<div style="background:rgba(79,172,254,0.1);border:1px solid rgba(79,172,254,0.3);border-radius:var(--radius);padding:10px 16px;font-size:13px;color:var(--blue);display:flex;align-items:center;gap:8px"><i class="ti ti-info-circle"></i> Adicione o salário em Lançamentos agendados para ver a projeção completa.</div>`;
     } else if (negMonths.length) {
       alertEl.innerHTML = `<div style="background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.3);border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:10px"><i class="ti ti-alert-triangle" style="font-size:20px;color:var(--red);flex:none"></i><div><div style="font-weight:600;color:var(--red);font-size:13px">Atenção: saldo negativo previsto</div><div style="font-size:12px;color:var(--ink2);margin-top:2px">${negMonths.map(r => r.label).join(', ')} — revise os lançamentos agendados.</div></div></div>`;
