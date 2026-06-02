@@ -1095,9 +1095,8 @@ function renderProjectionTable(bodyId, detailId, alertsId) {
       alertEl.innerHTML = `<div style="background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.3);border-radius:var(--radius);padding:10px 16px;font-size:13px;color:var(--green);display:flex;align-items:center;gap:8px"><i class="ti ti-circle-check"></i> Saldo positivo previsto nos próximos 6 meses.</div>`;
     }
   }
-  let hasIncome = S.scheduled.some(s => s.type === 'income' && s.status === 'upcoming');
   if (alertEl) {
-    colet hasIncome S.scheduled.some(s => s.type === 'income' && s.status === 'upcoming');
+    const hasIncome = S.scheduled.some(s => s.type === 'income' && s.status === 'upcoming');
     if (!hasIncome) {
       alertEl.innerHTML = `<div style="background:rgba(79,172,254,0.1);border:1px solid rgba(79,172,254,0.3);border-radius:var(--radius);padding:10px 16px;font-size:13px;color:var(--blue);display:flex;align-items:center;gap:8px"><i class="ti ti-info-circle"></i> Adicione o salário em Lançamentos agendados para ver a projeção completa.</div>`;
     } else if (negMonths.length) {
