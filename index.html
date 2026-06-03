@@ -207,13 +207,13 @@ tr:hover td{background:rgba(255,255,255,0.03)}
 .transfer-fields.visible{display:block}
 
 /* MOBILE CARDS */
-.tx-card-mobile{display:none;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:0;margin-bottom:8px}
+.tx-card-mobile{display:block;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:0;margin-bottom:8px}
 .tx-card-mobile .tx-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;gap:8px}
 .tx-card-mobile .tx-desc{font-size:14px;font-weight:600;color:var(--ink);flex:1}
 .tx-card-mobile .tx-val{font-size:16px;font-weight:700;white-space:nowrap}
 .tx-card-mobile .tx-meta{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
 .tx-card-mobile .tx-actions{display:flex;gap:6px}
-.desktop-table{display:table}
+.desktop-table{display:none}
 
 /* PATRIMÔNIO GRID */
 .acc-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -229,9 +229,7 @@ tr:hover td{background:rgba(255,255,255,0.03)}
 .empty-state p{font-size:13px}
 
 /* MOBILE */
-/* Always use cards for Agendados/Transações — works on all screen sizes */
-.desktop-table{display:none!important}
-.tx-card-mobile{display:block!important}
+/* Cards always shown, tables always hidden */
 @media(max-width:900px){
   /* Prevent horizontal overflow globally */
   .content{padding:12px!important;overflow-x:hidden}
