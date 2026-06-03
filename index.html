@@ -207,13 +207,13 @@ tr:hover td{background:rgba(255,255,255,0.03)}
 .transfer-fields.visible{display:block}
 
 /* MOBILE CARDS */
-.tx-card-mobile{display:block;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:0;margin-bottom:8px}
+.tx-card-mobile{display:none;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:0;margin-bottom:8px}
 .tx-card-mobile .tx-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;gap:8px}
 .tx-card-mobile .tx-desc{font-size:14px;font-weight:600;color:var(--ink);flex:1}
 .tx-card-mobile .tx-val{font-size:16px;font-weight:700;white-space:nowrap}
 .tx-card-mobile .tx-meta{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
 .tx-card-mobile .tx-actions{display:flex;gap:6px}
-.desktop-table{display:none}
+.desktop-table{display:block}
 
 /* PATRIMÔNIO GRID */
 .acc-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -229,7 +229,7 @@ tr:hover td{background:rgba(255,255,255,0.03)}
 .empty-state p{font-size:13px}
 
 /* MOBILE */
-/* Cards always shown, tables always hidden */
+@media(max-width:900px){.desktop-table{display:none!important}.tx-card-mobile{display:block!important}}
 @media(max-width:900px){
   /* Prevent horizontal overflow globally */
   .content{padding:12px!important;overflow-x:hidden}
@@ -1427,7 +1427,7 @@ function renderTxList() {
   const fc=document.getElementById('f-cat')?.value;
   const fm=document.getElementById('f-month')?.value;
   if(ft)txs=txs.filter(t=>t.type===ft);
-  if(fa)txs=txs.filter(t=>t.account_id===fa);
+  if(fa)txs=txs.filter(t=>t.account_id===fa||t.to_account_id===fa);
   if(fc)txs=txs.filter(t=>t.category===fc);
   if(fm)txs=txs.filter(t=>t.date?.startsWith(fm));
   txs.sort((a,b)=>b.date?.localeCompare(a.date));
@@ -1743,7 +1743,8 @@ function renderScheduled() {
   const freqL={monthly:'Mensal',weekly:'Semanal',quarterly:'Trimestral',annual:'Anual',once:'Único'};
   const sorted=[...S.scheduled].sort((a,b)=>a.next_date?.localeCompare(b.next_date));
   if(!sorted.length){el.innerHTML='<div class="empty-state"><i class="ti ti-calendar-repeat"></i><p>Sem lançamentos agendados</p></div>';return;}
-  el.innerHTML=`<table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Frequência</th><th>Titular</th><th style="text-align:right">Valor</th><th>Estado</th><th></th></tr></thead><tbody>`+
+  // Desktop table
+  const scDesktop = `<div class="table-wrap desktop-table"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Frequência</th><th>Titular</th><th style="text-align:right">Valor</th><th>Estado</th><th></th></tr></thead><tbody>`+
     sorted.map(s=>`<tr>
       <td style="white-space:nowrap;color:var(--ink3)">${s.next_date||''}</td>
       <td>${s.description}</td>
@@ -1756,7 +1757,30 @@ function renderScheduled() {
         ${s.status!=='paid'?`<button class="btn sm" onclick="markScPaid('${s.id}')" title="Registrar como pago"><i class="ti ti-check"></i></button>`:''}
         <button class="btn danger sm" onclick="deleteSc('${s.id}')" title="Excluir"><i class="ti ti-trash"></i></button>
       </td>
-    </tr>`).join('')+'</tbody></table>';
+    </tr>`).join('')+'</tbody></table></div>';
+
+  // Mobile cards
+  const scMobile = sorted.map(s=>`<div class="tx-card-mobile">
+    <div style="padding:12px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
+        <div style="font-size:14px;font-weight:600;flex:1">${s.description}</div>
+        <div style="font-size:16px;font-weight:700;white-space:nowrap" class="${s.type==='income'?'amount-pos':'amount-neg'}">${s.type==='income'?'+':'-'}${fmt(s.amount)}</div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">
+        <span style="font-size:11px;color:var(--ink3)">${s.next_date||''}</span>
+        <span style="font-size:11px;background:var(--card2);border:1px solid var(--border);border-radius:20px;padding:1px 7px">${s.category}</span>
+        <span style="font-size:11px;color:var(--ink3)">${freqL[s.frequency]||s.frequency}</span>
+        ${ownerBadge(s.owner)}
+        <span class="badge ${s.status==='paid'?'badge-paid':'badge-upcoming'}">${s.status==='paid'?'Registrado':'Pendente'}</span>
+      </div>
+      <div style="display:flex;gap:6px">
+        ${s.status!=='paid'?`<button class="btn sm" onclick="markScPaid('${s.id}')"><i class="ti ti-check"></i> Registrar</button>`:''}
+        <button class="btn danger sm" onclick="deleteSc('${s.id}')"><i class="ti ti-trash"></i></button>
+      </div>
+    </div>
+  </div>`).join('');
+
+  el.innerHTML = scDesktop + scMobile;
 }
 
 // ─── ACCOUNTS ─────────────────────────────────────────────────────────────────
