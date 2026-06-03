@@ -817,6 +817,24 @@ function updateSyncStatus(msg) {
   document.getElementById('sync-status').textContent = msg;
 }
 
+// ─── TOAST NOTIFICATION ─────────────────────────────────────────────────────
+function showToast(message, type='success') {
+  const existing = document.getElementById('toast-notification');
+  if (existing) existing.remove();
+  const colors = {
+    success: {bg:'rgba(0,212,170,0.15)', border:'rgba(0,212,170,0.4)', color:'var(--green)'},
+    error:   {bg:'rgba(255,107,107,0.15)', border:'rgba(255,107,107,0.4)', color:'var(--red)'},
+    info:    {bg:'rgba(79,172,254,0.15)', border:'rgba(79,172,254,0.4)', color:'var(--blue)'},
+  };
+  const c = colors[type] || colors.success;
+  const toast = document.createElement('div');
+  toast.id = 'toast-notification';
+  toast.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:${c.bg};border:1px solid ${c.border};color:${c.color};padding:12px 24px;border-radius:12px;font-size:14px;font-weight:600;z-index:9999;box-shadow:0 4px 24px rgba(0,0,0,0.4);transition:opacity 0.3s;white-space:nowrap`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.style.opacity='0'; setTimeout(()=>toast.remove(), 300); }, 2500);
+}
+
 // ─── NAVIGATION ───────────────────────────────────────────────────────────────
 const PAGE_TITLES = {dashboard:'Dashboard',wealth:'Patrimônio',quick:'Adicionar transação',transactions:'Transações',scheduled:'Lançamentos agendados',import:'Importar dados',accounts:'Contas',reports:'Relatórios',categories:'Categorias',projection:'Projeção financeira'};
 
@@ -1476,7 +1494,7 @@ async function saveTxModal() {
   try {
     if(currentTxId){await dbPatch('transactions',data,'id=eq.'+currentTxId);S.transactions=S.transactions.map(t=>t.id===currentTxId?{...t,...data}:t);}
     else{const res=await dbPost('transactions',data);if(res&&res[0])S.transactions.unshift(res[0]);}
-    closeTxModal();renderTxList();renderDashboard();updateSyncStatus('Salvo ✓');
+    closeTxModal();renderTxList();renderDashboard();updateSyncStatus('Salvo ✓');showToast('✓ Transação salva com sucesso!');
   } catch(e){updateSyncStatus('Erro');alert('Erro: '+e.message);}
 }
 function closeTxModal(){document.getElementById('tx-modal').classList.remove('open');currentTxId=null;}
@@ -1493,7 +1511,37 @@ async function saveManualTx() {
     if(res&&res[0])S.transactions.unshift(res[0]);
     document.getElementById('m-desc').value='';document.getElementById('m-amount').value='';document.getElementById('m-notes').value='';
     updateSyncStatus('Salvo ✓');
-    addChatMsg('✓ Transação guardada com sucesso!','system');
+    renderDashboard();
+    // Show confirmation card
+    const valSign = data.type==='income'?'+':data.type==='transfer'?'':'-';
+    const accN = S.accounts.find(a=>a.id===data.account_id)?.name||'—';
+    document.getElementById('ai-preview').innerHTML=`<div class="preview-card" style="margin-top:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+        <i class="ti ti-circle-check"></i> Transação salva
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px">
+        <div style="background:var(--card2);border-radius:var(--radius-sm);padding:8px 10px">
+          <div style="color:var(--ink3);font-size:10px;text-transform:uppercase;margin-bottom:2px">Descrição</div>
+          <div style="font-weight:600">${data.description}</div>
+        </div>
+        <div style="background:var(--card2);border-radius:var(--radius-sm);padding:8px 10px">
+          <div style="color:var(--ink3);font-size:10px;text-transform:uppercase;margin-bottom:2px">Valor</div>
+          <div style="font-weight:700;font-size:15px" class="${data.type==='income'?'amount-pos':'amount-neg'}">${valSign}€${parseFloat(data.amount).toFixed(2)}</div>
+        </div>
+        <div style="background:var(--card2);border-radius:var(--radius-sm);padding:8px 10px">
+          <div style="color:var(--ink3);font-size:10px;text-transform:uppercase;margin-bottom:2px">Categoria</div>
+          <div style="font-weight:600">${data.category}${data.subcategory&&data.subcategory!=='—'?' / '+data.subcategory:''}</div>
+        </div>
+        <div style="background:var(--card2);border-radius:var(--radius-sm);padding:8px 10px">
+          <div style="color:var(--ink3);font-size:10px;text-transform:uppercase;margin-bottom:2px">Conta</div>
+          <div style="font-weight:600">${accN}</div>
+        </div>
+      </div>
+      <button class="btn full" style="margin-top:10px" onclick="document.getElementById('ai-preview').innerHTML=''">
+        <i class="ti ti-x"></i> Fechar
+      </button>
+    </div>`;
+    setTimeout(()=>document.getElementById('ai-preview')?.scrollIntoView({behavior:'smooth',block:'nearest'}),100);
   } catch(e){updateSyncStatus('Erro');alert('Erro: '+e.message);}
 }
 
@@ -1918,6 +1966,12 @@ function parseNLLocal(text) {
   else result.type = 'expense';
 
   // ── TRANSFER ACCOUNT MATCHING ──
+  // Normalize Revolut phonetic variations before processing
+  const tNorm = t
+    .replace(/revolu[tc]e?|revolú[tc]e?|revolution|revolución|revolução/gi, 'revolut')
+    .replace(/\bcin[tds]ia\b|\bsinthia\b|\bsinsia\b/gi, 'cynthia')
+    .replace(/\bkonjunta\b|\bconjuncta\b|\bconjuntá\b/gi, 'conjunta');
+
   if (result.type === 'transfer') {
     result.category = 'Transferência interna';
     result.subcategory = '—';
@@ -1953,7 +2007,11 @@ function parseNLLocal(text) {
       // Re-score against specific portions
       function scoreAgainst(acc, portion) {
         const n = acc.name.toLowerCase();
-        const p = portion.toLowerCase();
+        // Normalize phonetic variations in the portion text
+        const p = portion.toLowerCase()
+          .replace(/revolu[tc]e?|revolú[tc]e?|revolution|revolución|revolução/gi, 'revolut')
+          .replace(/\bcin[tds]ia\b|\bsinthia\b|\bsinsia\b/gi, 'cynthia')
+          .replace(/\bkonjunta\b|\bconjuncta\b/gi, 'conjunta');
         let score = 0;
         if (n === 'fortuneo' && p.includes('fortuneo')) score += 10;
         if (n === 'bnp paribas rafael' && p.includes('bnp') && p.includes('rafael')) score += 10;
@@ -2010,7 +2068,7 @@ function parseNLLocal(text) {
   else if (/restaurant|restaurante|resto|brasserie|bistro|cafe|café|pizza|sushi|burger|mcdonald|kfc|tapas|palais nippon|imperial exo|mk chaten/.test(d)) { result.category='Restaurante'; result.subcategory='—'; }
   else if (/deliveroo/.test(d)) { result.category='Delivery'; result.subcategory='Deliveroo'; }
   else if (/uber.*eat|ubereats/.test(d)) { result.category='Delivery'; result.subcategory='Uber Eats'; }
-  else if (/netflix/.test(d)) { result.category='Subscription'; result.subcategory='Netflix'; }
+  else if (/netflix|netflex|netflics/.test(d)) { result.category='Subscription'; result.subcategory='Netflix'; }
   else if (/openai|chatgpt/.test(d)) { result.category='Subscription'; result.subcategory='OpenAI'; }
   else if (/apple|itunes/.test(d)) { result.category='Subscription'; result.subcategory='Apple'; }
   else if (/\bratp\b|navigo/.test(d)) { result.category='Transporte'; result.subcategory='RATP/Navigo'; }
@@ -2028,7 +2086,7 @@ function parseNLLocal(text) {
   else if (/manicure|manicura|nail|unhas|cabeleireiro|coiffeur|coiffure|cabelo|hair|waxing|depilação|depilacion|massage|massagem|massaje/.test(d)) { result.category='Serviços'; result.subcategory='Manicure'; }
   else if (/aluguel|loyer|rent/.test(d)) { result.category='Casa'; result.subcategory='Aluguel'; }
   else if (/totalenergies|electricidade|gaz/.test(d)) { result.category='Casa'; result.subcategory='TotalEnergies'; }
-  else if (/\bsfr\b/.test(d)) { result.category='Casa'; result.subcategory='SFR'; }
+  else if (/\bsfr\b|ese efe erre/.test(d)) { result.category='Casa'; result.subcategory='SFR'; }
   else if (/remitly|wise|brasil|brazil|família/.test(d)) { result.category='Remessa Brasil'; result.subcategory='—'; }
   else if (/frenchie|francês|frances/.test(d)) { result.category='Educação'; result.subcategory='El Frenchie'; }
   else if (/salário|salario|salary/.test(d) && result.type==='income') { result.category='Salário'; result.subcategory=result.owner==='cynthia'?'Cynthia':'Rafael'; }
