@@ -1453,56 +1453,82 @@ function renderTxList() {
   // Get current account filter for transfer sign logic
   const filteredAccId = document.getElementById('f-account')?.value || '';
 
-  // Unified card grid — grouped by date (desktop and mobile)
+  // Desktop table with wide description column
+  const desktopTable = `<table class="desktop-table" style="table-layout:fixed;width:100%"><thead><tr>
+    <th style="width:90px">Data</th>
+    <th style="width:35%">Descrição</th>
+    <th style="width:18%">Categoria</th>
+    <th style="width:14%">Conta</th>
+    <th style="width:80px">Titular</th>
+    <th style="width:100px;text-align:right">Valor</th>
+    <th style="width:80px"></th>
+  </tr></thead><tbody>`+
+    txs.map(t=>{
+      let valClass='', valPrefix='', dirLabel='';
+      if (t.type==='income') { valClass='amount-pos'; valPrefix='+'; }
+      else if (t.type==='expense') { valClass='amount-neg'; valPrefix='-'; }
+      else {
+        if (filteredAccId && t.to_account_id===filteredAccId) { valClass='amount-pos'; valPrefix='+'; dirLabel=` <span style="font-size:10px;color:var(--ink3)">← ${accName(t.account_id)}</span>`; }
+        else if (filteredAccId && t.account_id===filteredAccId) { valClass='amount-neg'; valPrefix='-'; dirLabel=` <span style="font-size:10px;color:var(--ink3)">→ ${accName(t.to_account_id)}</span>`; }
+        else { valClass=''; valPrefix=''; dirLabel=` <span style="font-size:10px;color:var(--ink3)">${accName(t.account_id)} → ${accName(t.to_account_id)}</span>`; }
+      }
+      return `<tr>
+        <td style="white-space:nowrap;color:var(--ink3);font-size:12px">${t.date}</td>
+        <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.description}${dirLabel}</td>
+        <td style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.category}${t.subcategory&&t.subcategory!=='—'?' / '+t.subcategory:''}</td>
+        <td style="font-size:12px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${accName(t.account_id)}</td>
+        <td>${ownerBadge(t.owner)}</td>
+        <td style="text-align:right" class="${valClass}">${valPrefix}${fmt(t.amount)}</td>
+        <td style="white-space:nowrap">
+          <button class="btn sm" onclick="editTx('${t.id}')"><i class="ti ti-edit"></i></button>
+          <button class="btn danger sm" onclick="deleteTx('${t.id}')"><i class="ti ti-trash"></i></button>
+        </td>
+      </tr>`;
+    }).join('')+'</tbody></table>';
+
+  // Mobile cards grouped by date
   const txByDate = {};
   txs.forEach(t => { if(!txByDate[t.date]) txByDate[t.date]=[]; txByDate[t.date].push(t); });
-
-  const desktopTable = Object.entries(txByDate).map(([date, dayTxs]) => {
+  const mobileCards = Object.entries(txByDate).map(([date, dayTxs]) => {
     const dayExp = dayTxs.filter(t=>t.type==='expense').reduce((s,t)=>s+parseFloat(t.amount),0);
     const dayInc = dayTxs.filter(t=>t.type==='income').reduce((s,t)=>s+parseFloat(t.amount),0);
     const dayNet = dayInc - dayExp;
     const dateObj = new Date(date+'T12:00:00');
     const dateLabel = dateObj.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-
-    const cards = dayTxs.map(t => {
+    const txCards = dayTxs.map(t => {
       let valClass='', valPrefix='', subLine='';
-      if (t.type==='income') { valClass='amount-pos'; valPrefix='+'; }
-      else if (t.type==='expense') { valClass='amount-neg'; valPrefix='-'; }
-      else {
-        if (filteredAccId && t.to_account_id===filteredAccId) { valClass='amount-pos'; valPrefix='+'; subLine=`← ${accName(t.account_id)}`; }
-        else if (filteredAccId && t.account_id===filteredAccId) { valClass='amount-neg'; valPrefix='-'; subLine=`→ ${accName(t.to_account_id)}`; }
-        else { valClass=''; valPrefix=''; subLine=`${accName(t.account_id)} → ${accName(t.to_account_id)}`; }
+      if (t.type==='income'){valClass='amount-pos';valPrefix='+';}
+      else if(t.type==='expense'){valClass='amount-neg';valPrefix='-';}
+      else{
+        if(filteredAccId&&t.to_account_id===filteredAccId){valClass='amount-pos';valPrefix='+';subLine=`← ${accName(t.account_id)}`;}
+        else if(filteredAccId&&t.account_id===filteredAccId){valClass='amount-neg';valPrefix='-';subLine=`→ ${accName(t.to_account_id)}`;}
+        else{valClass='';valPrefix='';subLine=`${accName(t.account_id)} → ${accName(t.to_account_id)}`;}
       }
-      const catMeta = t.category+(t.subcategory&&t.subcategory!=='—'?' / '+t.subcategory:'');
-      const accDisplay = subLine || accName(t.account_id);
-      return `<div class="tx-item-card">
-        <div class="card-top">
-          ${catIcon(t.category,18)}
-          <div class="card-title">${t.description}</div>
-          <div class="card-amount ${valClass}">${valPrefix}${fmt(t.amount)}</div>
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border)">
+        ${catIcon(t.category,18)}
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.description}</div>
+          <div style="font-size:11px;color:var(--ink3);margin-top:2px">${subLine||accName(t.account_id)||t.owner}</div>
         </div>
-        <div class="card-meta">
-          <span style="font-size:11px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:20px;padding:1px 8px;color:var(--ink2)">${catMeta}</span>
-          ${ownerBadge(t.owner)}
-          <span style="font-size:11px;color:var(--ink3)">${accDisplay}</span>
-        </div>
-        <div class="card-actions">
-          <button class="btn sm" onclick="editTx('${t.id}')"><i class="ti ti-edit"></i> Editar</button>
-          <button class="btn danger sm" onclick="deleteTx('${t.id}')"><i class="ti ti-trash"></i></button>
+        <div style="text-align:right;flex:none">
+          <div style="font-size:14px;font-weight:700" class="${valClass}">${valPrefix}${fmt(t.amount)}</div>
+          <div style="display:flex;gap:4px;margin-top:4px;justify-content:flex-end">
+            <button class="btn sm" style="padding:3px 6px" onclick="editTx('${t.id}')"><i class="ti ti-edit" style="font-size:12px"></i></button>
+            <button class="btn danger sm" style="padding:3px 6px" onclick="deleteTx('${t.id}')"><i class="ti ti-trash" style="font-size:12px"></i></button>
+          </div>
         </div>
       </div>`;
     }).join('');
-
-    return `<div class="day-group">
-      <div class="day-header">
-        <span class="day-label">${dateLabel}</span>
-        <span class="day-net ${dayNet>=0?'amount-pos':'amount-neg'}">${dayNet>=0?'+':''}${fmt(dayNet)}</span>
+    return `<div class="tx-card-mobile" style="padding:0">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--card2);border-radius:var(--radius) var(--radius) 0 0">
+        <span style="font-size:12px;color:var(--ink2);text-transform:capitalize">${dateLabel}</span>
+        <span style="font-size:13px;font-weight:700" class="${dayNet>=0?'amount-pos':'amount-neg'}">${dayNet>=0?'+':''}${fmt(dayNet)}</span>
       </div>
-      <div class="tx-card-grid">${cards}</div>
+      <div style="padding:0 12px">${txCards}</div>
     </div>`;
   }).join('');
 
-  el.innerHTML = desktopTable;
+  el.innerHTML = desktopTable + mobileCards;
 }
 
 async function deleteTx(id) {
