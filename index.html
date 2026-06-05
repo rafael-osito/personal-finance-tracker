@@ -547,6 +547,10 @@ tr:hover td{background:rgba(255,255,255,0.03)}
             <div><label>Próxima data</label><input type="date" id="sc-date"></div>
           </div>
           <div class="form-row">
+            <div><label>Válido até (opcional)</label><input type="date" id="sc-end-date"></div>
+            <div></div>
+          </div>
+          <div class="form-row">
             <div><label>Conta</label><select id="sc-account" onchange="toggleScTransferFields()"></select></div>
             <div><label>Titular</label><select id="sc-owner"><option value="rafael">Rafael</option><option value="cynthia">Cynthia</option><option value="joint">Conjunto</option></select></div>
           </div>
@@ -1758,6 +1762,8 @@ function openScModal(){
   document.getElementById('sc-freq').value='monthly';
   document.getElementById('sc-date').value=today();
   document.getElementById('sc-owner').value='rafael';
+  const endDateEl = document.getElementById('sc-end-date');
+  if (endDateEl) endDateEl.value='';
   // Hide transfer fields
   const tf = document.getElementById('sc-transfer-fields');
   if (tf) tf.classList.remove('visible');
@@ -1780,7 +1786,8 @@ function closeScModal(){document.getElementById('sc-modal').classList.remove('op
 
 async function saveSc() {
   const scType=document.getElementById('sc-type').value;
-  const data={description:document.getElementById('sc-desc').value.trim(),type:scType,category:document.getElementById('sc-cat').value,subcategory:document.getElementById('sc-subcat').value,amount:parseFloat(document.getElementById('sc-amount').value)||0,account_id:document.getElementById('sc-account').value||null,to_account_id:(scType==='transfer'?document.getElementById('sc-to-account')?.value||null:null),owner:document.getElementById('sc-owner').value,frequency:document.getElementById('sc-freq').value,next_date:document.getElementById('sc-date').value,status:'upcoming'};
+  const scEndDate=document.getElementById('sc-end-date')?.value||null;
+  const data={description:document.getElementById('sc-desc').value.trim(),type:scType,category:document.getElementById('sc-cat').value,subcategory:document.getElementById('sc-subcat').value,amount:parseFloat(document.getElementById('sc-amount').value)||0,account_id:document.getElementById('sc-account').value||null,to_account_id:(scType==='transfer'?document.getElementById('sc-to-account')?.value||null:null),owner:document.getElementById('sc-owner').value,frequency:document.getElementById('sc-freq').value,next_date:document.getElementById('sc-date').value,end_date:scEndDate,status:'upcoming'};
   if(!data.description||!data.amount||!data.next_date){alert('Preencha todos os campos');return;}
   updateSyncStatus('A salvar...');
   try {
@@ -1803,6 +1810,38 @@ async function markScPaid(id) {
   } catch(e){updateSyncStatus('Erro');alert('Erro: '+e.message);}
 }
 
+function editSc(id) {
+  const s = S.scheduled.find(x => x.id === id);
+  if (!s) return;
+  openScModal();
+  setTimeout(() => {
+    document.getElementById('sc-desc').value = s.description || '';
+    document.getElementById('sc-amount').value = s.amount || '';
+    document.getElementById('sc-type').value = s.type || 'expense';
+    document.getElementById('sc-freq').value = s.frequency || 'monthly';
+    document.getElementById('sc-date').value = s.next_date || '';
+    document.getElementById('sc-owner').value = s.owner || 'rafael';
+    if (document.getElementById('sc-end-date')) document.getElementById('sc-end-date').value = s.end_date || '';
+    toggleScTransferFields();
+    updateScCats();
+    setTimeout(() => {
+      document.getElementById('sc-cat').value = s.category || '';
+      updateScSubcats();
+      setTimeout(() => {
+        document.getElementById('sc-subcat').value = s.subcategory || '';
+        const accSel = document.getElementById('sc-account');
+        if (accSel && s.account_id) accSel.value = s.account_id;
+        if (s.type === 'transfer') {
+          const toSel = document.getElementById('sc-to-account');
+          if (toSel && s.to_account_id) toSel.value = s.to_account_id;
+        }
+      }, 60);
+    }, 60);
+    // Store ID for update
+    document.getElementById('sc-modal').dataset.editId = id;
+  }, 80);
+}
+
 async function deleteSc(id) {
   if(!confirm('Excluir este agendamento?')) return;
   try {
@@ -1823,7 +1862,10 @@ function renderScheduled() {
   const scFType = document.getElementById('sc-f-type')?.value||'';
   const scFAccount = document.getElementById('sc-f-account')?.value||'';
   const scFStatus = document.getElementById('sc-f-status')?.value||'';
-  let sorted=[...S.scheduled].sort((a,b)=>a.next_date?.localeCompare(b.next_date));
+  const todayForFilter = today();
+  let sorted=[...S.scheduled]
+    .filter(s => !s.end_date || s.end_date >= todayForFilter) // hide expired
+    .sort((a,b)=>a.next_date?.localeCompare(b.next_date));
   if(scFType) sorted=sorted.filter(s=>s.type===scFType);
   if(scFAccount) sorted=sorted.filter(s=>s.account_id===scFAccount||s.to_account_id===scFAccount);
   if(scFStatus) sorted=sorted.filter(s=>s.status===scFStatus);
@@ -1839,7 +1881,8 @@ function renderScheduled() {
       <td style="text-align:right" class="${s.type==='income'?'amount-pos':'amount-neg'}">${s.type==='income'?'+':'-'}${fmt(s.amount)}</td>
       <td><span class="badge ${s.status==='paid'?'badge-paid':'badge-upcoming'}">${s.status==='paid'?'Registrado':'Pendente'}</span></td>
       <td style="white-space:nowrap">
-        ${s.status!=='paid'?`<button class="btn sm" onclick="markScPaid('${s.id}')" title="Registrar como pago"><i class="ti ti-check"></i></button>`:''}
+        ${s.status!=='paid'?`<button class="btn sm" onclick="markScPaid('${s.id}')" title="Registrar"><i class="ti ti-check"></i></button>`:''}
+        <button class="btn sm" onclick="editSc('${s.id}')" title="Editar"><i class="ti ti-edit"></i></button>
         <button class="btn danger sm" onclick="deleteSc('${s.id}')" title="Excluir"><i class="ti ti-trash"></i></button>
       </td>
     </tr>`).join('')+'</tbody></table></div>';
@@ -1860,6 +1903,7 @@ function renderScheduled() {
       </div>
       <div style="display:flex;gap:6px">
         ${s.status!=='paid'?`<button class="btn sm" onclick="markScPaid('${s.id}')"><i class="ti ti-check"></i> Registrar</button>`:''}
+        <button class="btn sm" onclick="editSc('${s.id}')"><i class="ti ti-edit"></i></button>
         <button class="btn danger sm" onclick="deleteSc('${s.id}')"><i class="ti ti-trash"></i></button>
       </div>
     </div>
