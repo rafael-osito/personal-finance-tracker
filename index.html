@@ -521,8 +521,13 @@ tr:hover td{background:rgba(255,255,255,0.03)}
 
     <!-- SCHEDULED -->
     <div class="page" id="page-scheduled">
-      <div style="margin-bottom:16px;display:flex;justify-content:flex-end">
+      <div style="margin-bottom:12px;display:flex;justify-content:flex-end">
         <button class="btn primary" onclick="openScModal()"><i class="ti ti-plus"></i>Novo lançamento</button>
+      </div>
+      <div class="filter-bar" style="margin-bottom:12px">
+        <select id="sc-f-type" onchange="renderScheduled()"><option value="">Todos os tipos</option><option value="expense">Despesa</option><option value="income">Receita</option><option value="transfer">Transferência</option></select>
+        <select id="sc-f-account" onchange="renderScheduled()"><option value="">Todas as contas</option></select>
+        <select id="sc-f-status" onchange="renderScheduled()"><option value="">Todos os estados</option><option value="upcoming">Pendente</option><option value="paid">Registrado</option></select>
       </div>
       <div class="card"><div id="sc-list"></div></div>
       <div class="modal-overlay" id="sc-modal">
@@ -990,6 +995,27 @@ function renderDashboard() {
   document.getElementById('d-income').textContent=fmt(inc);
   document.getElementById('d-expense').textContent=fmt(exp);
   const netEl=document.getElementById('d-net');netEl.textContent=fmt(net);
+
+  // Pending scheduled alert
+  const todayStr = today();
+  const pendingDue = S.scheduled.filter(s => s.status==='upcoming' && s.next_date <= todayStr);
+  const existingAlert = document.getElementById('pending-scheduled-alert');
+  if (existingAlert) existingAlert.remove();
+  if (pendingDue.length > 0) {
+    const alertDiv = document.createElement('div');
+    alertDiv.id = 'pending-scheduled-alert';
+    alertDiv.style.cssText = 'background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.4);border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:10px;margin-bottom:16px;cursor:pointer';
+    alertDiv.onclick = () => nav('scheduled');
+    alertDiv.innerHTML = `<i class="ti ti-clock-exclamation" style="font-size:20px;color:var(--gold);flex:none"></i>
+      <div style="flex:1">
+        <div style="font-weight:600;color:var(--gold);font-size:13px">${pendingDue.length} lançamento${pendingDue.length>1?'s':''} aguardando confirmação</div>
+        <div style="font-size:12px;color:var(--ink2);margin-top:2px">${pendingDue.map(s=>s.description).slice(0,3).join(', ')}${pendingDue.length>3?' ...':''}</div>
+      </div>
+      <i class="ti ti-chevron-right" style="color:var(--ink3)"></i>`;
+    const content2 = document.getElementById('content') || document.querySelector('.content');
+    const firstCard = content2?.querySelector('.page.active .card, .page.active .metrics-grid');
+    if (firstCard) firstCard.parentNode.insertBefore(alertDiv, firstCard);
+  }
   netEl.className='metric-value '+(net>=0?'positive':'negative');
   document.getElementById('d-upcoming').textContent=up;
   document.getElementById('d-income-sub').textContent=mTxs.filter(t=>t.type==='income').length+' entradas';
@@ -1035,7 +1061,7 @@ const VAR_SPENDING = {
   'Mercado':        563.62,
   'Restaurante':    448.92,
   'Compras':        456.46,
-  'Saúde':          528.95,
+  // Saúde excluída — maioria reembolsada pela assurance maladie (efeito net zero)
   'Transporte':     161.01,
   'Educação':        99.67,
   'Delivery':        47.75,
@@ -1789,16 +1815,27 @@ async function deleteSc(id) {
 function renderScheduled() {
   const el=document.getElementById('sc-list');
   const freqL={monthly:'Mensal',weekly:'Semanal',quarterly:'Trimestral',annual:'Anual',once:'Único'};
-  const sorted=[...S.scheduled].sort((a,b)=>a.next_date?.localeCompare(b.next_date));
+  // Populate account filter dynamically
+  const scAccSel = document.getElementById('sc-f-account');
+  if (scAccSel && scAccSel.options.length <= 1) {
+    S.accounts.forEach(a => { const o=document.createElement('option'); o.value=a.id; o.textContent=a.name; scAccSel.appendChild(o); });
+  }
+  const scFType = document.getElementById('sc-f-type')?.value||'';
+  const scFAccount = document.getElementById('sc-f-account')?.value||'';
+  const scFStatus = document.getElementById('sc-f-status')?.value||'';
+  let sorted=[...S.scheduled].sort((a,b)=>a.next_date?.localeCompare(b.next_date));
+  if(scFType) sorted=sorted.filter(s=>s.type===scFType);
+  if(scFAccount) sorted=sorted.filter(s=>s.account_id===scFAccount||s.to_account_id===scFAccount);
+  if(scFStatus) sorted=sorted.filter(s=>s.status===scFStatus);
   if(!sorted.length){el.innerHTML='<div class="empty-state"><i class="ti ti-calendar-repeat"></i><p>Sem lançamentos agendados</p></div>';return;}
   // Desktop table
-  const scDesktop = `<div class="table-wrap desktop-table"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Frequência</th><th>Titular</th><th style="text-align:right">Valor</th><th>Estado</th><th></th></tr></thead><tbody>`+
+  const scDesktop = `<div class="table-wrap desktop-table"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Frequência</th><th>Conta</th><th style="text-align:right">Valor</th><th>Estado</th><th></th></tr></thead><tbody>`+
     sorted.map(s=>`<tr>
       <td style="white-space:nowrap;color:var(--ink3)">${s.next_date||''}</td>
       <td>${s.description}</td>
       <td style="font-size:12px">${s.category}</td>
       <td style="font-size:12px;color:var(--ink3)">${freqL[s.frequency]||s.frequency}</td>
-      <td>${ownerBadge(s.owner)}</td>
+      <td style="font-size:12px;color:var(--ink3)">${accName(s.account_id)||s.owner}</td>
       <td style="text-align:right" class="${s.type==='income'?'amount-pos':'amount-neg'}">${s.type==='income'?'+':'-'}${fmt(s.amount)}</td>
       <td><span class="badge ${s.status==='paid'?'badge-paid':'badge-upcoming'}">${s.status==='paid'?'Registrado':'Pendente'}</span></td>
       <td style="white-space:nowrap">
