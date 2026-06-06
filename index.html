@@ -801,30 +801,30 @@ const HEADERS = {
 // ─── CATEGORIES ───────────────────────────────────────────────────────────────
 const CATS = {
   expense: {
-    'Casa':['Aluguel','TotalEnergies','SFR','Allianz','Free (histórico)','Orange (histórico)','Outros'],
-    'Mercado':['Monoprix','Carrefour','Lidl','Costco','Picard','Grand Frais','Franprix','Auchan','Imperial Exo','Normal','Outros'],
-    'Restaurante':['—'],
-    'Viagem':['Hotel/Airbnb','Gasolina','Car Rental','Bilhetes','Outros'],
-    'Saúde':['Consulta médica','Farmácia','Kiné','Orthodontie','Mutuelle','Outros'],
-    'Compras':['Amazon','Shein/Temu','Roupa','Cosméticos','Outros'],
-    'Carro':['Gasolina','Seguro','Empréstimo','Manutenção','Estacionamento','Outros'],
-    'Transporte':['RATP/Navigo','Uber/Bolt','Autoroute','Outros'],
-    'Subscription':['Netflix','OpenAI','Apple','Amazon Prime','Academia','Claude','Google Cloud','Cifra Club','Outros'],
-    'Entretenimentos':['Cinema','Museu','Parque','Outros'],
+    'Admin':['Finance Public','Post','Visa','Outros'],
+    'Carro':['Empréstimo','Estacionamento','Gasolina','Manutenção','Seguro','Outros'],
+    'Compras':['Amazon','Cosméticos','Roupa','Shein/Temu','Outros'],
     'Delivery':['Deliveroo','Uber Eats','Outros'],
-    'Remessa Brasil':['—'],
     'Educação':['El Frenchie','Outros'],
-    'Serviços':['Manicure','Cabeleireiro','Outros'],
-    'Admin':['Visa','Finance Public','Post','Outros'],
+    'Entretenimentos':['Cinema','Museu','Parque','Outros'],
+    'Mercado':['Auchan','Carrefour','Costco','Franprix','Grand Frais','Imperial Exo','Lidl','Monoprix','Normal','Picard','Outros'],
+    'Remessa Brasil':['—'],
+    'Restaurante':['—'],
+    'Saúde':['Consulta médica','Farmácia','Kiné','Mutuelle','Orthodontie','Outros'],
+    'Serviços':['Cabeleireiro','Manicure','Outros'],
+    'Subscription':['Academia','Amazon Prime','Apple','Cifra Club','Claude','Google Cloud','Netflix','OpenAI','Outros'],
+    'Transporte':['Autoroute','RATP/Navigo','Uber/Bolt','Outros'],
+    'Viagem':['Bilhetes','Car Rental','Gasolina','Hotel/Airbnb','Outros'],
+    'Casa':['Allianz','Aluguel','Free (histórico)','Orange (histórico)','SFR','TotalEnergies','Outros'],
     'Outros':['Taxas bancárias','—'],
   },
   income: {
-    'Salário':['Rafael','Cynthia'],
     'Reembolso':['CPAM','Helium','Outros'],
+    'Salário':['Cynthia','Rafael'],
     'Outros':['—'],
   },
   transfer: {
-    'Investimento':['Trading212','Swisslife'],
+    'Investimento':['Swisslife','Trading212'],
     'Transferência interna':['—'],
   }
 };
@@ -908,7 +908,7 @@ function nav(p) {
   document.querySelectorAll('.nav-item').forEach(x=>{if(x.getAttribute('onclick')?.includes("'"+p+"'"))x.classList.add('active')});
   document.getElementById('page-title').textContent = PAGE_TITLES[p]||p;
   closeSidebar();
-  const renders = {dashboard:renderDashboard,wealth:renderWealth,transactions:renderTxList,scheduled:renderScheduled,accounts:renderAccounts,reports:renderReports,import:renderOpeningBalances,categories:renderCategoriesPage};
+  const renders = {dashboard:renderDashboard,wealth:renderWealth,transactions:renderTxList,scheduled:renderScheduled,accounts:renderAccounts,reports:renderReports,import:renderOpeningBalances,categories:renderCategoriesPage,projection:renderProjectionPage};
   if(renders[p]) renders[p]();
 }
 
@@ -937,7 +937,7 @@ function populateCatSelect(selId, subId, type) {
   const sel = document.getElementById(selId);
   if(!sel) return;
   const v = sel.value;
-  sel.innerHTML = Object.keys(cats).map(c=>`<option>${c}</option>`).join('');
+  sel.innerHTML = sortCats(Object.keys(cats)).map(c=>`<option>${c}</option>`).join('');
   if(v && [...sel.options].some(o=>o.value===v)) sel.value=v;
   populateSubcatSelect(selId, subId, type);
 }
@@ -1062,16 +1062,14 @@ function renderDashboard() {
 // ─── VARIABLE SPENDING AVERAGES (calculated from Jan-May 2026 history) ───────
 // Median monthly spend per category, excluding items already in scheduled payments
 const VAR_SPENDING = {
+  // Mediana Jan-Mai 2026 — apenas subcategorias estáveis e recorrentes
+  // Excluídas: Saúde (reembolsada), Educação (já agendada), Viagem (sazonal), one-offs
   'Mercado':        563.62,
-  'Restaurante':    448.92,
-  'Compras':        456.46,
-  // Saúde excluída — maioria reembolsada pela assurance maladie (efeito net zero)
-  'Transporte':     161.01,
-  'Educação':        99.67,
-  'Delivery':        47.75,
+  'Restaurante':    378.29,
+  'Transporte':     167.15,
+  'Compras':        120.87,
+  'Delivery':        43.51,
   'Entretenimentos': 27.05,
-  'Viagem':          40.68,
-  'Outros':          11.88,
   'Serviços':         1.00,
 };
 const VAR_SPENDING_TOTAL = Object.values(VAR_SPENDING).reduce((s,v)=>s+v, 0);
@@ -2189,11 +2187,13 @@ function parseNLLocal(text) {
   else result.type = 'expense';
 
   // ── TRANSFER ACCOUNT MATCHING ──
-  // Normalize Revolut phonetic variations before processing
+  // Normalize Revolut and other phonetic variations before processing
   const tNorm = t
-    .replace(/revolu[tc]e?|revolú[tc]e?|revolution|revolución|revolução/gi, 'revolut')
-    .replace(/\bcin[tds]ia\b|\bsinthia\b|\bsinsia\b/gi, 'cynthia')
-    .replace(/\bkonjunta\b|\bconjuncta\b|\bconjuntá\b/gi, 'conjunta');
+    .replace(/revolu[tc][ei]?[aon]?s?|revolú[tc]e?|revolución|revolução|revolut[oi]on|rrevolut|re[bv]olut/gi, 'revolut')
+    .replace(/\bcin[tds]ia\b|\bsinthia\b|\bsinsia\b|\bsintia\b|\bsínthia\b/gi, 'cynthia')
+    .replace(/\bkonjunta\b|\bconjuncta\b|\bconjuntá\b|\bconjunta\b/gi, 'conjunta')
+    .replace(/\bfortuño\b|\bfortuñeo\b|\bfortúneo\b/gi, 'fortuneo')
+    .replace(/\bbnp paribas\b|\bbnp paris\b|\bbnp parisas\b/gi, 'bnp paribas');
 
   if (result.type === 'transfer') {
     result.category = 'Transferência interna';
