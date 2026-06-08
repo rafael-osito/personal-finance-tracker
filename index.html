@@ -1896,7 +1896,7 @@ function renderScheduled() {
       <td style="font-size:12px">${s.category}</td>
       <td style="font-size:12px;color:var(--ink3)">${freqL[s.frequency]||s.frequency}</td>
       <td style="font-size:12px;color:var(--ink3)">${accName(s.account_id)||s.owner}</td>
-      <td style="text-align:right" class="${s.type==='income'?'amount-pos':'amount-neg'}">${s.type==='income'?'+':'-'}${fmt(s.amount)}</td>
+      <td style="text-align:right" class="${s.type==='income'?'amount-pos':(s.type==='transfer'&&s.to_account_id===scFAccount&&scFAccount)?'amount-pos':'amount-neg'}">${s.type==='income'?'+':(s.type==='transfer'&&s.to_account_id===scFAccount&&scFAccount)?'+':'-'}${fmt(s.amount)}</td>
       <td><span class="badge ${s.status==='paid'?'badge-paid':'badge-upcoming'}">${s.status==='paid'?'Registrado':'Pendente'}</span></td>
       <td style="white-space:nowrap">
         ${s.status!=='paid'?`<button class="btn sm" onclick="markScPaid('${s.id}')" title="Registrar"><i class="ti ti-check"></i></button>`:''}
@@ -1910,7 +1910,7 @@ function renderScheduled() {
     <div style="padding:12px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
         <div style="font-size:14px;font-weight:600;flex:1">${s.description}</div>
-        <div style="font-size:16px;font-weight:700;white-space:nowrap" class="${s.type==='income'?'amount-pos':'amount-neg'}">${s.type==='income'?'+':'-'}${fmt(s.amount)}</div>
+        <div style="font-size:16px;font-weight:700;white-space:nowrap" class="${s.type==='income'?'amount-pos':(s.type==='transfer'&&s.to_account_id===scFAccount&&scFAccount)?'amount-pos':'amount-neg'}">${s.type==='income'?'+':(s.type==='transfer'&&s.to_account_id===scFAccount&&scFAccount)?'+':'-'}${fmt(s.amount)}</div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">
         <span style="font-size:11px;color:var(--ink3)">${s.next_date||''}</span>
