@@ -1128,6 +1128,49 @@ function expandScheduled(months) {
   return result;
 }
 
+function calcRemainingVarSpending(monthKey) {
+  // Calculate remaining estimated variable spending for the current month,
+  // based on month-to-date actuals vs the historical estimate per category.
+  const now = new Date();
+  const todayDate = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysRemaining = daysInMonth - todayDate;
+  const daysPassed = todayDate;
+
+  // Sum actual spending this month per category (only VAR_SPENDING categories)
+  const actualByCat = {};
+  S.transactions.forEach(t => {
+    if (t.type !== 'expense') return;
+    if (!t.date?.startsWith(monthKey)) return;
+    if (!(t.category in VAR_SPENDING)) return;
+    actualByCat[t.category] = (actualByCat[t.category] || 0) + parseFloat(t.amount);
+  });
+
+  let remaining = 0;
+  for (const [cat, monthlyEstimate] of Object.entries(VAR_SPENDING)) {
+    const actual = actualByCat[cat] || 0;
+
+    if (actual >= monthlyEstimate) {
+      // Already exceeded estimate — nothing more projected for this category
+      continue;
+    }
+
+    const gap = monthlyEstimate - actual;
+
+    if (todayDate <= 15) {
+      // Early in the month: assume spending normalizes, cover the gap
+      remaining += gap;
+    } else {
+      // Past mid-month: respect the recent pace instead of forcing the full estimate
+      const pace = daysPassed > 0 ? (actual / daysPassed) : 0;
+      const paceProjection = pace * daysRemaining;
+      // Use the lower of the two: pace-based projection or the remaining gap
+      remaining += Math.min(paceProjection, gap);
+    }
+  }
+  return Math.round(remaining * 100) / 100;
+}
+
 function buildProjection(months = 6) {
   const balances = calcAllBalances();
   const liquidTotal = Object.values(balances).reduce((s, v) => s + v, 0);
@@ -1144,10 +1187,45 @@ function buildProjection(months = 6) {
 
     const totalInc = bucket.income.reduce((s, e) => s + e.amount, 0);
     const totalFixedExp = bucket.expenses.reduce((s, e) => s + e.amount, 0);
-    // Variable spending estimate (from historical averages)
-    const totalVarExp = VAR_SPENDING_TOTAL;
+
+    // Variable spending estimate
+    let totalVarExp;
+    let varBreakdown = {};
+    if (i === 0) {
+      // CURRENT MONTH: adjust for already-spent amounts and remaining days
+      const daysInMonth = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+      const dayOfMonth = now.getDate();
+      const daysRemaining = Math.max(0, daysInMonth - dayOfMonth);
+      const fractionRemaining = daysRemaining / daysInMonth;
+
+      // Calculate actual spending this month per variable category
+      const monthTxs = S.transactions.filter(t => t.date && t.date.startsWith(key) && t.type === 'expense');
+      const spentByCategory = {};
+      monthTxs.forEach(t => {
+        spentByCategory[t.category] = (spentByCategory[t.category] || 0) + parseFloat(t.amount);
+      });
+
+      totalVarExp = 0;
+      for (const [cat, estimate] of Object.entries(VAR_SPENDING)) {
+        const alreadySpent = spentByCategory[cat] || 0;
+        if (alreadySpent >= estimate) {
+          // Already exceeded estimate — nothing more to add
+          varBreakdown[cat] = 0;
+        } else {
+          // Remaining estimate, prorated by days left in month
+          const remaining = (estimate - alreadySpent) * fractionRemaining;
+          varBreakdown[cat] = Math.round(remaining * 100) / 100;
+        }
+        totalVarExp += varBreakdown[cat];
+      }
+      totalVarExp = Math.round(totalVarExp * 100) / 100;
+    } else {
+      // FUTURE MONTHS: full estimate
+      totalVarExp = VAR_SPENDING_TOTAL;
+      varBreakdown = {...VAR_SPENDING};
+    }
+
     const totalExp = totalFixedExp + totalVarExp;
-    // Consolidated net: only real income and expenses (transfers are neutral)
     const net = totalInc - totalExp;
     cumulative += net;
 
@@ -1156,6 +1234,7 @@ function buildProjection(months = 6) {
       income: totalInc,
       fixedExpenses: totalFixedExp,
       varExpenses: totalVarExp,
+      varBreakdown,
       expenses: totalExp,
       net,
       cumulative,
@@ -1186,7 +1265,7 @@ function renderProjectionTable(bodyId, detailId, alertsId) {
       <td style="font-weight:600">${r.label}${r.isCurrent ? ' <span style="font-size:10px;background:var(--gold);color:#1A1A2E;padding:1px 6px;border-radius:10px;margin-left:4px">Atual</span>' : ''}</td>
       <td class="amount-pos">${r.income > 0 ? '+'+fmt(r.income) : '—'}</td>
       <td class="amount-neg">${r.fixedExpenses > 0 ? '-'+fmt(r.fixedExpenses) : '—'}</td>
-      <td style="color:var(--gold);font-size:12px">~-${fmt(r.varExpenses)}</td>
+      <td style="color:var(--gold);font-size:12px">${r.isCurrent ? 'restante ~-'+fmt(r.varExpenses) : '~-'+fmt(r.varExpenses)}</td>
       <td class="${r.net >= 0 ? 'amount-pos' : 'amount-neg'}" style="font-weight:700">${r.net >= 0 ? '+' : ''}${fmt(r.net)}</td>
       <td class="${r.cumulative >= 0 ? 'amount-pos' : 'amount-neg'}" style="font-weight:700">${fmt(r.cumulative)}</td>
       <td><span class="proj-expand">▼</span></td>
@@ -1246,10 +1325,13 @@ function toggleProjDetail(key, detailId, idx) {
       <div class="tx-amt amount-neg">-${fmt(e.amount)}</div>
     </div>`).join('');
   }
-  html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gold);margin:10px 0 6px">Despesas variáveis estimadas (média histórica Jan-Mai 2026)</div>`;
-  html += Object.entries(VAR_SPENDING).sort((a,b)=>b[1]-a[1]).map(([cat,amt])=>`
+  const breakdownLabel = row.isCurrent
+    ? `Estimativa restante do mês (ajustada pelo gasto já realizado)`
+    : `Despesas variáveis estimadas (média histórica Jan-Mai 2026)`;
+  html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gold);margin:10px 0 6px">${breakdownLabel}</div>`;
+  html += Object.entries(row.varBreakdown).sort((a,b)=>b[1]-a[1]).map(([cat,amt])=>`
     <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border)">
-      <span style="color:var(--ink2)">${cat}</span><span style="color:var(--gold)">~-${fmt(amt)}/mês</span>
+      <span style="color:var(--ink2)">${cat}</span><span style="color:var(--gold)">${amt>0?'~-'+fmt(amt):'—'}</span>
     </div>`).join('');
   html += `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;font-weight:700;border-top:1px solid var(--border2);margin-top:4px">
     <span style="color:var(--ink3)">Total variável estimado</span>
