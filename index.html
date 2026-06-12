@@ -336,7 +336,6 @@ tr:hover td{background:rgba(255,255,255,0.03)}
     <div class="nav-item" onclick="nav('import')"><i class="ti ti-upload"></i>Importar</div>
     <div class="nav-item" onclick="nav('accounts')"><i class="ti ti-wallet"></i>Contas</div>
     <div class="nav-item" onclick="nav('reports')"><i class="ti ti-chart-bar"></i>Relatórios</div>
-    <div class="nav-item" onclick="nav('categories')"><i class="ti ti-tags"></i>Categorias</div>
     <div class="nav-item" onclick="nav('projection')"><i class="ti ti-chart-arrows"></i>Projeção</div>
     <div class="nav-item" onclick="nav('categories')"><i class="ti ti-tag"></i>Categorias</div>
   </div>
@@ -654,41 +653,6 @@ tr:hover td{background:rgba(255,255,255,0.03)}
       <div class="card">
         <div class="card-title"><i class="ti ti-building-bank"></i>Projeção por conta</div>
         <div id="proj-by-account"></div>
-      </div>
-    </div>
-
-    <!-- CATEGORIES -->
-
-    <div class="page" id="page-categories">
-      <div class="grid2">
-        <div class="card">
-          <div class="card-title"><i class="ti ti-plus"></i>Nova categoria</div>
-          <label>Nome da categoria</label>
-          <input type="text" id="new-cat-name" placeholder="Ex: Animais de estimação">
-          <label>Tipo</label>
-          <select id="new-cat-type">
-            <option value="expense">Despesa</option>
-            <option value="income">Receita</option>
-            <option value="transfer">Transferência</option>
-          </select>
-          <div style="margin-top:14px">
-            <button class="btn primary full" onclick="addCustomCategory()"><i class="ti ti-plus"></i>Adicionar categoria</button>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-title"><i class="ti ti-plus"></i>Nova subcategoria</div>
-          <label>Categoria</label>
-          <select id="new-sub-cat-parent" onchange="renderSubcatParentChange()"></select>
-          <label>Nome da subcategoria</label>
-          <input type="text" id="new-subcat-name" placeholder="Ex: Veterinário">
-          <div style="margin-top:14px">
-            <button class="btn primary full" onclick="addCustomSubcategory()"><i class="ti ti-plus"></i>Adicionar subcategoria</button>
-          </div>
-        </div>
-      </div>
-      <div class="card" style="margin-top:4px">
-        <div class="card-title"><i class="ti ti-list"></i>Categorias e subcategorias atuais</div>
-        <div id="cats-overview"></div>
       </div>
     </div>
 
@@ -2043,7 +2007,7 @@ function renderCategoriesPage() {
   // Populate add-sub-cat-sel
   const sel = document.getElementById('add-sub-cat-sel');
   if (sel) {
-    const allCats = [...Object.keys(CATS.expense||{}), ...Object.keys(CATS.income||{}), ...Object.keys(CATS.transfer||{})];
+    const allCats = sortCats([...Object.keys(CATS.expense||{}), ...Object.keys(CATS.income||{}), ...Object.keys(CATS.transfer||{})]);
     sel.innerHTML = allCats.map(c=>`<option>${c}</option>`).join('');
   }
   // Render list
@@ -2053,14 +2017,16 @@ function renderCategoriesPage() {
   let html = '';
   for (const type of ['expense','income','transfer']) {
     const cats = CATS[type] || {};
-    for (const [cat, subs] of Object.entries(cats)) {
+    const sortedCatNames = sortCats(Object.keys(cats));
+    for (const cat of sortedCatNames) {
+      const subs = cats[cat];
       html += `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
           <span style="font-weight:600;font-size:13px">${cat}</span>
           <span class="badge badge-${type==='expense'?'expense':type==='income'?'income':'transfer'}" style="font-size:10px">${typeLabel[type]}</span>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:5px">
-          ${subs.filter(s=>s!=='—').map(s=>`<span style="background:var(--card2);border:1px solid var(--border);border-radius:20px;padding:2px 10px;font-size:11px">${s}</span>`).join('')}
+          ${sortSubs(subs).filter(s=>s!=='—').map(s=>`<span style="background:var(--card2);border:1px solid var(--border);border-radius:20px;padding:2px 10px;font-size:11px">${s}</span>`).join('')}
         </div>
       </div>`;
     }
@@ -2753,45 +2719,11 @@ function populateSubcatParentSelect() {
   sel.innerHTML = allCats.map(c=>`<option value="${c}">${c}</option>`).join('');
 }
 
-function renderSubcatParentChange() {} // placeholder
+ // placeholder
 
-function addCustomCategory() {
-  const name = document.getElementById('new-cat-name').value.trim();
-  const type = document.getElementById('new-cat-type').value;
-  if(!name) { alert('Insira um nome para a categoria'); return; }
-  if(CATS[type][name]) { alert('Esta categoria já existe'); return; }
-  CATS[type][name] = ['Outros'];
-  document.getElementById('new-cat-name').value = '';
-  // Persist in localStorage
-  saveCustomCats();
-  populateAllSelects();
-  populateSubcatParentSelect();
-  renderCategoriesPage();
-  updateSyncStatus('Categoria criada ✓');
-}
 
-function addCustomSubcategory() {
-  const parent = document.getElementById('new-sub-cat-parent').value;
-  const name = document.getElementById('new-subcat-name').value.trim();
-  if(!name) { alert('Insira um nome para a subcategoria'); return; }
-  // Find which type has this category
-  for(const type of ['expense','income','transfer']) {
-    if(CATS[type][parent]) {
-      if(CATS[type][parent].includes(name)) { alert('Esta subcategoria já existe'); return; }
-      if(!CATS[type][parent].includes('Outros')) {
-        CATS[type][parent].push(name);
-      } else {
-        CATS[type][parent].splice(CATS[type][parent].indexOf('Outros'), 0, name);
-      }
-      break;
-    }
-  }
-  document.getElementById('new-subcat-name').value = '';
-  saveCustomCats();
-  populateAllSelects();
-  renderCategoriesPage();
-  updateSyncStatus('Subcategoria criada ✓');
-}
+
+
 
 function saveCustomCats() {
   try { localStorage.setItem('pft_custom_cats', JSON.stringify(CATS)); } catch(e){}
