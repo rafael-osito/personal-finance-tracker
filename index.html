@@ -1854,13 +1854,28 @@ async function saveSc() {
   const scType=document.getElementById('sc-type').value;
   const scEndDate=document.getElementById('sc-end-date')?.value||null;
   const data={description:document.getElementById('sc-desc').value.trim(),type:scType,category:document.getElementById('sc-cat').value,subcategory:document.getElementById('sc-subcat').value,amount:parseFloat(document.getElementById('sc-amount').value)||0,account_id:document.getElementById('sc-account').value||null,to_account_id:(scType==='transfer'?document.getElementById('sc-to-account')?.value||null:null),owner:document.getElementById('sc-owner').value,frequency:document.getElementById('sc-freq').value,next_date:document.getElementById('sc-date').value,end_date:scEndDate,status:'upcoming'};
-  if(!data.description||!data.amount||!data.next_date){alert('Preencha todos os campos');return;}
-  updateSyncStatus('A salvar...');
+  if(!data.description||!data.amount||!data.next_date){alert('Preencha descrição, valor e data');return;}
+  
+  // Check if editing existing item
+  const editId = document.getElementById('sc-modal').dataset.editId || '';
+  if (editId) delete document.getElementById('sc-modal').dataset.editId;
+  
+  updateSyncStatus('Salvando...');
   try {
-    const res=await dbPost('scheduled',data);
-    if(res&&res[0])S.scheduled.push(res[0]);
+    if (editId) {
+      // Update existing
+      const patchHeaders = {'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Prefer':'return=minimal'};
+      await fetch(API('scheduled')+'?id=eq.'+editId, {method:'PATCH', headers:patchHeaders, body:JSON.stringify(data)});
+      const idx = S.scheduled.findIndex(s=>s.id===editId);
+      if (idx>=0) S.scheduled[idx] = {...S.scheduled[idx], ...data};
+    } else {
+      // Create new
+      const res=await dbPost('scheduled',data);
+      if(res&&res[0]) S.scheduled.push(res[0]);
+    }
     S.scheduled.sort((a,b)=>a.next_date?.localeCompare(b.next_date));
     closeScModal();renderScheduled();renderDashboard();updateSyncStatus('Salvo ✓');
+    showToast(editId ? '✓ Agendamento atualizado!' : '✓ Agendamento criado!');
   } catch(e){updateSyncStatus('Erro');alert('Erro: '+e.message);}
 }
 
