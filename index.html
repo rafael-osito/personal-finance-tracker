@@ -1252,6 +1252,7 @@ function renderProjectionTable(bodyId, detailId, alertsId) {
   const rows = buildProjection(6);
   const tbody = document.getElementById(bodyId);
   if (!tbody) return;
+  const alertEl = document.getElementById(alertsId);
 
   // Update table header
   const thead = document.querySelector('#'+bodyId)?.closest('table')?.querySelector('thead tr');
