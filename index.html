@@ -483,16 +483,16 @@ tr:hover td{background:rgba(255,255,255,0.03)}
               <div><label>Tipo</label><select id="m-type" onchange="updateManualCats();toggleTransferFields('m')"><option value="expense">Despesa</option><option value="income">Receita</option><option value="transfer">Transferência</option></select></div>
               <div><label>Valor (€)</label><input type="number" id="m-amount" step="0.01" placeholder="0.00"></div>
             </div>
+            <div class="form-row">
+              <div><label>Conta origem</label><select id="m-account" onchange="toggleTransferFields('m')"></select></div>
+              <div><label>Titular</label><select id="m-owner"><option value="rafael">Rafael</option><option value="cynthia">Cynthia</option><option value="joint">Conjunto</option></select></div>
+            </div>
             <div class="transfer-fields" id="m-transfer-fields">
               <label>Conta destino</label><select id="m-to-account"></select>
             </div>
             <div class="form-row">
               <div><label>Categoria</label><select id="m-cat" onchange="updateManualSubcats()"></select></div>
               <div><label>Subcategoria</label><select id="m-subcat"></select></div>
-            </div>
-            <div class="form-row">
-              <div><label>Conta</label><select id="m-account"></select></div>
-              <div><label>Titular</label><select id="m-owner"><option value="rafael">Rafael</option><option value="cynthia">Cynthia</option><option value="joint">Conjunto</option></select></div>
             </div>
             <label>Observações</label><input type="text" id="m-notes" placeholder="Opcional">
             <div style="margin-top:16px"><button class="btn primary full" onclick="saveManualTx()"><i class="ti ti-check"></i>Salvar transação</button></div>
@@ -1422,7 +1422,9 @@ function toggleTransferFields(prefix) {
   const type = document.getElementById(prefix + '-type')?.value;
   const fields = document.getElementById(prefix + '-transfer-fields');
   if (fields) fields.classList.toggle('visible', type === 'transfer');
-  // Populate destination account dropdown
+  // Update Conta label
+  const accLabel = document.querySelector(`label[for="${prefix}-account"], #${prefix}-account`)?.previousElementSibling;
+  // Populate destination account dropdown based on currently selected source
   const toSel = document.getElementById(prefix + '-to-account');
   if (toSel && type === 'transfer') {
     const srcId = document.getElementById(prefix + '-account')?.value;
