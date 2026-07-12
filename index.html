@@ -1084,7 +1084,7 @@ function expandScheduled(months) {
 
   for (let i = 0; i < months; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-    const key = d.toISOString().slice(0, 7);
+    const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
     result[key] = { income: [], expenses: [] };
   }
 
@@ -1098,7 +1098,7 @@ function expandScheduled(months) {
     // Generate occurrences for each month in range
     for (let i = 0; i < months; i++) {
       const monthDate = new Date(now.getFullYear(), now.getMonth() + i, 1);
-      const monthKey = monthDate.toISOString().slice(0, 7);
+      const monthKey = monthDate.getFullYear() + '-' + String(monthDate.getMonth()+1).padStart(2,'0');
       const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
 
       let occurs = false;
@@ -1193,7 +1193,7 @@ function buildProjection(months = 6) {
 
   for (let i = 0; i < months; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-    const key = d.toISOString().slice(0, 7);
+    const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
     const label = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
     const bucket = scheduled[key] || { income: [], expenses: [] };
 
