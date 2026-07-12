@@ -1091,7 +1091,9 @@ function expandScheduled(months) {
   for (const sc of S.scheduled) {
     if (sc.status === 'paid') continue;
     const freq = sc.frequency;
-    const baseDate = new Date(sc.next_date);
+    // Parse date as local date to avoid UTC timezone shift
+    const [bY,bM,bD] = (sc.next_date||'').split('-').map(Number);
+    const baseDate = new Date(bY, bM-1, bD);
 
     // Generate occurrences for each month in range
     for (let i = 0; i < months; i++) {
@@ -1101,11 +1103,21 @@ function expandScheduled(months) {
 
       let occurs = false;
       if (freq === 'once') {
-        occurs = sc.next_date && sc.next_date.startsWith(monthKey);
+        // Compare YYYY-MM portion directly to avoid timezone issues
+        occurs = sc.next_date && sc.next_date.slice(0,7) === monthKey;
       } else if (freq === 'monthly') {
-        // Occurs in this month if base date day falls in month, and month >= base month
-        const base = new Date(sc.next_date);
-        if (monthDate >= new Date(base.getFullYear(), base.getMonth(), 1)) occurs = true;
+        // Occurs in this month if month >= base month
+        const [y,m] = (sc.next_date||'').split('-').map(Number);
+        const baseMonth = new Date(y, m-1, 1);
+        // Check end_date if present
+        if (sc.end_date) {
+          const [ey,em] = sc.end_date.split('-').map(Number);
+          const endMonth = new Date(ey, em-1, 1);
+          if (monthDate > endMonth) { occurs = false; }
+          else if (monthDate >= baseMonth) occurs = true;
+        } else {
+          if (monthDate >= baseMonth) occurs = true;
+        }
       } else if (freq === 'weekly') {
         occurs = true; // simplified: assume 4x/month
       } else if (freq === 'quarterly') {
