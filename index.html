@@ -1906,20 +1906,21 @@ async function markScPaid(id) {
       const newDate = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
       // Check end_date
       const expired = sc.end_date && newDate > sc.end_date;
-      await Promise.all([
+      const [txRes2] = await Promise.all([
         dbPost('transactions', txData),
         expired
           ? dbPatch('scheduled',{status:'paid'},'id=eq.'+id)
           : dbPatch('scheduled',{next_date:newDate},'id=eq.'+id)
       ]);
+      if(txRes2&&txRes2[0]) S.transactions.unshift(txRes2[0]);
       S.scheduled = S.scheduled.map(s => s.id===id ? {...s, next_date: expired?s.next_date:newDate, status: expired?'paid':'upcoming'} : s);
     } else {
       // Once — mark as paid
-      await Promise.all([dbPost('transactions',txData), dbPatch('scheduled',{status:'paid'},'id=eq.'+id)]);
+      const [txRes3] = await Promise.all([dbPost('transactions',txData), dbPatch('scheduled',{status:'paid'},'id=eq.'+id)]);
+      if(txRes3&&txRes3[0]) S.transactions.unshift(txRes3[0]);
       S.scheduled = S.scheduled.map(s=>s.id===id?{...s,status:'paid'}:s);
     }
-    const txRes = S.transactions;
-    renderScheduled();renderDashboard();updateSyncStatus('Registrado ✓');
+    renderScheduled();renderTxList();renderDashboard();updateSyncStatus('Registrado ✓');
     showToast('✓ Lançamento registrado!');
   } catch(e){updateSyncStatus('Erro');alert('Erro: '+e.message);}
 }
