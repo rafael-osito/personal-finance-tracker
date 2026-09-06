@@ -771,14 +771,14 @@ const CATS = {
     'Delivery':['Deliveroo','Uber Eats','Outros'],
     'Educação':['El Frenchie','Outros'],
     'Entretenimentos':['Cinema','Museu','Parque','Outros'],
-    'Mercado':['Auchan','Carrefour','Costco','Franprix','Grand Frais','Imperial Exo','Lidl','Monoprix','Normal','Picard','Outros'],
+    'Mercado':['Auchan','Carrefour','Costco','E.Leclerc','Franprix','Grand Frais','Imperial Exo','Lidl','Monoprix','Normal','Picard','Outros'],
     'Remessa Brasil':['—'],
     'Restaurante':['—'],
     'Saúde':['Consulta médica','Farmácia','Kiné','Mutuelle','Orthodontie','Outros'],
     'Serviços':['Cabeleireiro','Manicure','Outros'],
     'Subscription':['Academia','Amazon Prime','Apple','Cifra Club','Claude','Google Cloud','Netflix','OpenAI','Outros'],
     'Transporte':['Autoroute','RATP/Navigo','Uber/Bolt','Outros'],
-    'Viagem':['Bilhetes','Car Rental','Gasolina','Hotel/Airbnb','Outros'],
+    'Viagem':['Bilhetes','Car Rental','Gasolina','Hotel/Airbnb','Pedagem','Outros'],
     'Casa':['Allianz','Aluguel','Free (histórico)','Orange (histórico)','SFR','TotalEnergies','Outros'],
     'Outros':['Taxas bancárias','—'],
   },
@@ -1894,13 +1894,33 @@ async function saveSc() {
 
 async function markScPaid(id) {
   const sc=S.scheduled.find(s=>s.id===id);if(!sc)return;
-  const txData={date:sc.next_date,description:sc.description,type:sc.type,category:sc.category,subcategory:sc.subcategory,amount:sc.amount,account_id:sc.account_id,owner:sc.owner,source:'scheduled',notes:'Auto-gerado de agendamento'};
-  updateSyncStatus('A salvar...');
+  const txData={date:sc.next_date,description:sc.description,type:sc.type,category:sc.category,subcategory:sc.subcategory,amount:sc.amount,account_id:sc.account_id,to_account_id:sc.to_account_id||null,owner:sc.owner,source:'scheduled',notes:'Auto-gerado de agendamento'};
+  updateSyncStatus('Salvando...');
   try {
-    const [txRes]=await Promise.all([dbPost('transactions',txData),dbPatch('scheduled',{status:'paid'},'id=eq.'+id)]);
-    if(txRes&&txRes[0])S.transactions.unshift(txRes[0]);
-    S.scheduled=S.scheduled.map(s=>s.id===id?{...s,status:'paid'}:s);
+    if (sc.frequency === 'monthly' || sc.frequency === 'weekly' || sc.frequency === 'annual') {
+      // Advance next_date instead of marking as paid — keeps the recurring item active
+      const d = new Date(sc.next_date + 'T12:00:00');
+      if (sc.frequency === 'monthly') d.setMonth(d.getMonth() + 1);
+      else if (sc.frequency === 'weekly') d.setDate(d.getDate() + 7);
+      else if (sc.frequency === 'annual') d.setFullYear(d.getFullYear() + 1);
+      const newDate = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      // Check end_date
+      const expired = sc.end_date && newDate > sc.end_date;
+      await Promise.all([
+        dbPost('transactions', txData),
+        expired
+          ? dbPatch('scheduled',{status:'paid'},'id=eq.'+id)
+          : dbPatch('scheduled',{next_date:newDate},'id=eq.'+id)
+      ]);
+      S.scheduled = S.scheduled.map(s => s.id===id ? {...s, next_date: expired?s.next_date:newDate, status: expired?'paid':'upcoming'} : s);
+    } else {
+      // Once — mark as paid
+      await Promise.all([dbPost('transactions',txData), dbPatch('scheduled',{status:'paid'},'id=eq.'+id)]);
+      S.scheduled = S.scheduled.map(s=>s.id===id?{...s,status:'paid'}:s);
+    }
+    const txRes = S.transactions;
     renderScheduled();renderDashboard();updateSyncStatus('Registrado ✓');
+    showToast('✓ Lançamento registrado!');
   } catch(e){updateSyncStatus('Erro');alert('Erro: '+e.message);}
 }
 
