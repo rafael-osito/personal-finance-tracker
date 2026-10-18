@@ -19,7 +19,16 @@
   --font-body:'DM Sans',sans-serif;--font-display:'DM Serif Display',serif;
   --shadow:0 4px 24px rgba(0,0,0,0.4);
 }
+[data-theme="light"]{
+  --bg:#F0F2F8;--bg2:#E4E8F2;--bg3:#C8D0E8;--card:#FFFFFF;--card2:#F5F7FC;
+  --ink:#1A1A2E;--ink2:#4A4E6A;--ink3:#8A8EAA;
+  --border:rgba(0,0,0,0.08);--border2:rgba(0,0,0,0.15);
+  --shadow:0 4px 24px rgba(0,0,0,0.1);
+}
 body{font-family:var(--font-body);background:var(--bg);color:var(--ink);font-size:14px;min-height:100vh}
+/* theme toggle */
+.theme-toggle{background:none;border:none;cursor:pointer;color:var(--ink3);font-size:18px;padding:4px 6px;border-radius:var(--radius-sm);transition:color 0.15s}
+.theme-toggle:hover{color:var(--gold)}
 
 /* LOADING */
 #loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:1000}
@@ -350,6 +359,7 @@ tr:hover td{background:rgba(255,255,255,0.03)}
     </div>
     <div class="topbar-right">
       <span id="sync-status" style="font-size:11px;color:var(--ink3)"></span>
+      <button class="theme-toggle" id="theme-btn" onclick="toggleTheme()" title="Alternar tema"><i class="ti ti-moon"></i></button>
       <button class="btn sm" onclick="nav('quick')"><i class="ti ti-plus"></i>Adicionar</button>
     </div>
   </div>
@@ -842,6 +852,26 @@ async function init() {
 
 function updateSyncStatus(msg) {
   document.getElementById('sync-status').textContent = msg;
+}
+
+// ─── THEME TOGGLE ─────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const newTheme = isLight ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', newTheme === 'dark' ? '' : 'light');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.innerHTML = newTheme === 'light' ? '<i class="ti ti-sun"></i>' : '<i class="ti ti-moon"></i>';
+  try { localStorage.setItem('theme', newTheme); } catch(e) {}
+}
+function applyStoredTheme() {
+  try {
+    const t = localStorage.getItem('theme');
+    if (t === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+      const btn = document.getElementById('theme-btn');
+      if (btn) btn.innerHTML = '<i class="ti ti-sun"></i>';
+    }
+  } catch(e) {}
 }
 
 // ─── TOAST NOTIFICATION ─────────────────────────────────────────────────────
@@ -1415,7 +1445,9 @@ function toggleScTransferFields() {
   // Update cats for transfer type
   if (type === 'transfer') {
     document.getElementById('sc-cat').innerHTML = "<option value='Transferência interna'>Transferência interna</option><option value='Investimento'>Investimento</option>";
+    document.getElementById('sc-cat').value = 'Transferência interna';
     document.getElementById('sc-subcat').innerHTML = "<option value='—'>—</option><option value='Swisslife'>Swisslife</option><option value='Trading212'>Trading212</option>";
+    document.getElementById('sc-subcat').value = '—';
   }
 }
 
@@ -1809,9 +1841,9 @@ function autoFillScheduled(desc) {
 
   if (type === 'transfer') {
     document.getElementById('sc-cat').innerHTML = "<option value='Transferência interna'>Transferência interna</option><option value='Investimento'>Investimento</option>";
-    document.getElementById('sc-cat').value = cat;
+    document.getElementById('sc-cat').value = cat || 'Transferência interna';
     document.getElementById('sc-subcat').innerHTML = "<option value='—'>—</option><option value='Swisslife'>Swisslife</option><option value='Trading212'>Trading212</option>";
-    document.getElementById('sc-subcat').value = sub;
+    document.getElementById('sc-subcat').value = sub || '—';
     // Set destination account
     if (toAccName) {
       const srcId = document.getElementById('sc-account')?.value;
@@ -2884,6 +2916,7 @@ function loadCustomCats() {
 document.getElementById('m-date').value=today();
 document.getElementById('rpt-date').value=today();
 document.getElementById('f-month').value=thisMonth();
+applyStoredTheme();
 init();
 </script>
 </body>
