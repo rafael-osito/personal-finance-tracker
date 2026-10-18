@@ -787,7 +787,7 @@ const CATS = {
     'Saúde':['Consulta médica','Farmácia','Kiné','Mutuelle','Orthodontie','Outros'],
     'Serviços':['Cabeleireiro','Manicure','Outros'],
     'Subscription':['Academia','Amazon Prime','Apple','Cifra Club','Claude','Google Cloud','Netflix','OpenAI','Outros'],
-    'Transporte':['Autoroute','RATP/Navigo','Uber/Bolt','Outros'],
+    'Transporte':['Autoroute','RATP/Navigo','Taxi','Uber/Bolt','Outros'],
     'Viagem':['Bilhetes','Car Rental','Gasolina','Hotel/Airbnb','Pedagem','Outros'],
     'Casa':['Allianz','Aluguel','Free (histórico)','Orange (histórico)','SFR','TotalEnergies','Outros'],
     'Outros':['Taxas bancárias','—'],
@@ -802,6 +802,36 @@ const CATS = {
     'Transferência interna':['—'],
   }
 };
+
+// ─── CATS PERSISTENCE ────────────────────────────────────────────────────────
+(function restoreCustomCats() {
+  try {
+    const saved = localStorage.getItem('custom_cats');
+    if (!saved) return;
+    const custom = JSON.parse(saved);
+    for (const type of ['expense','income','transfer']) {
+      if (!custom[type]) continue;
+      for (const [cat, subs] of Object.entries(custom[type])) {
+        if (!CATS[type]) CATS[type] = {};
+        if (!CATS[type][cat]) {
+          CATS[type][cat] = subs;
+        } else {
+          // merge subcategories
+          for (const s of subs) {
+            if (!CATS[type][cat].includes(s)) CATS[type][cat].push(s);
+          }
+        }
+      }
+    }
+  } catch(e) { console.warn('restoreCustomCats:', e); }
+})();
+
+function persistCustomCats() {
+  try {
+    // Save only what differs from defaults — store the full CATS for simplicity
+    localStorage.setItem('custom_cats', JSON.stringify(CATS));
+  } catch(e) {}
+}
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let S = { accounts:[], transactions:[], scheduled:[], investments:[], liabilities:[], rptMode:'monthly', voiceLang:'pt-BR' };
@@ -2143,6 +2173,7 @@ function addCategory() {
   CATS[type][name] = subs;
   document.getElementById('new-cat-name').value = '';
   document.getElementById('new-cat-subs').value = '';
+  persistCustomCats();
   renderCategoriesPage();
   populateAllSelects();
   updateSyncStatus('Categoria adicionada ✓');
@@ -2163,6 +2194,7 @@ function addSubcategory() {
     }
   }
   document.getElementById('new-sub-name').value = '';
+  persistCustomCats();
   renderCategoriesPage();
   populateAllSelects();
   updateSyncStatus('Subcategoria adicionada ✓');
